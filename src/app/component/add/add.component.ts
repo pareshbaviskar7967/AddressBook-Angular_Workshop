@@ -1,11 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import {
-  FormArray,
-  FormBuilder,
-  FormControl,
-  FormGroup,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Person } from 'src/app/model/person';
 import { DataService } from 'src/app/service/data.service';
@@ -14,66 +9,109 @@ import { HttpService } from 'src/app/service/http.service';
 @Component({
   selector: 'app-add',
   templateUrl: './add.component.html',
-  styleUrls: ['./add.component.scss'],
+  styleUrls: ['./add.component.scss']
 })
 export class AddComponent implements OnInit {
-  public person: Person = new Person();
-  public personFormGroup: FormGroup;
+  public person: Person = new Person;
+  public addressBookFormGroup: FormGroup = new FormGroup({});
+  public leftButton: string = "Add";
+  public rightButton: string = "Reset";
+  public states: Array<any> = [];
+  public cities: Array<any> = [];
+  public stateDetails: Array<any> = [];
+  id: any;
 
-  constructor(
-    private formBuilder: FormBuilder,
+  /**
+  * Added Validation to the Address Book Fields.
+  */
+  constructor(private formBuilder: FormBuilder,
     private httpService: HttpService,
-    private router: Router,
-    private dataService: DataService,
-    private activatedRouter: ActivatedRoute
-  ) {
-
-    this.personFormGroup = this.formBuilder.group({
-      name: new FormControl('', [
-        Validators.required,
-        Validators.pattern('^[A-Z]{1}[a-zA-Zs]{2,}$'),
-      ]),
+    private activatedRoute: ActivatedRoute,
+    public router: Router,
+    private snackBar: MatSnackBar,
+    private dataservice: DataService) {
+    this.addressBookFormGroup = this.formBuilder.group({
+      name: new FormControl('', [Validators.required, Validators.pattern("^[A-Z]{1}[a-zA-Z\\s]{2,}$")]),
       address: new FormControl('', Validators.required),
-      city: new FormControl(''),
-      state: new FormControl(''),
-      email: new FormControl('', Validators.required),
-      zipcode: new FormControl('', Validators.required),
-      contactno: new FormControl('', Validators.required),
-    });
+      city: new FormControl('', Validators.required),
+      state: new FormControl('', Validators.required),
+      zipcode: new FormControl('', [Validators.required, Validators.pattern("^[0-9]{6}$")]),
+      contactno: new FormControl('', [Validators.required, Validators.pattern("^[0-9]{10}$")])
+    })
   }
 
+  /**
+  * Method to set value of a particular Address Book Id in the AddressBook FormBuilder.
+  * This method is called when update button is hit on the HOME page.
+  */
+
   ngOnInit(): void {
-    if (this.activatedRouter.snapshot.params['personId'] != undefined) {
-      this.dataService.currentPerson.subscribe((person) => {
-        if (Object.keys(person).length !== 0) {
-          this.personFormGroup.get('name')?.setValue(person.name);
-          this.personFormGroup.patchValue({ address: person.address });
-          this.personFormGroup.patchValue({ city: person.city });
-          this.personFormGroup.get('state')?.setValue(person.state);
-          this.personFormGroup.patchValue({ email: person.email });
-          this.personFormGroup.get('zipcode')?.setValue(person.zipcode);
-          this.personFormGroup.patchValue({ contactno: person.contactno });
+    
+    if (this.activatedRoute.snapshot.params['personId'] != undefined) {
+      this.leftButton = "Update";
+      this.rightButton = "Cancel";
+      this.id = this.activatedRoute.snapshot.params['personId']
+      this.httpService.getAddressBookDetailsByID(this.id).subscribe(x => {
+        console.log(x.data);
+        this.addressBookFormGroup.patchValue(x.data);
+        if (x.data.state) {
+          this.getCity(x.data.state);
         }
       });
     }
+    this.getState();
   }
 
-  onSubmit(): void {
-    if (this.activatedRouter.snapshot.params['personId'] != undefined) {
-      this.httpService
-        .updatePersonData(
-          this.activatedRouter.snapshot.params['personId'],
-          this.personFormGroup.value
-        )
-        .subscribe((Response) => {
-          this.router.navigateByUrl('/home');
-        });
-    } else {
-      this.person = this.personFormGroup.value;
-      this.httpService.addPersonData(this.person).subscribe((response) => {
-        console.log(this.person);
+  /**
+   * Method to call http service functions for Update and Add of Data.
+   * These methods are called when add button is hit.
+   */
+  submit(): void {
+
+    console.log(this.addressBookFormGroup);
+    this.person = this.addressBookFormGroup.value;
+
+    if (this.activatedRoute.snapshot.params['personId'] != undefined) {
+      this.httpService.updatePersonData(this.activatedRoute.snapshot.params['personId'], this.person).subscribe(response => {
+        console.log(response);
         this.router.navigateByUrl('/home');
+        this.snackBar.open(" User Data Updated Successfully", "Updated", { duration: 3000 });
       });
     }
+    else {
+      this.httpService.addPersonData(this.person).subscribe(response => {
+        console.log(response);
+        this.router.navigateByUrl('/home');
+        this.snackBar.open("User Data Submitted Successfully", "Submitted", { duration: 3000 });
+    });
+  
+}
+  }
+
+getCity(state: any) {
+  // console.log("hi");
+  for (let i = 0; i < this.stateDetails.length; i++) {
+    if (this.stateDetails[i]?.state === state) {
+      this.cities = this.stateDetails[i]?.city;
+      console.log(this.stateDetails[i]?.city);
+    }
+  }
+}
+
+getState(): void {
+  this.httpService.getStateDetails().subscribe(data => {
+    this.stateDetails = data.data;
+    console.log(this.stateDetails);
+    for (let i = 0; i < this.stateDetails.length; i++) {
+      this.states.push(this.stateDetails[i]?.state);
+    }
+  });
+}
+
+  /**
+   * Method to show error when validating the input by the user.
+   */
+  public checkError = (controlName: string, errorName: string) => {
+    return this.addressBookFormGroup.controls[controlName].hasError(errorName);
   }
 }

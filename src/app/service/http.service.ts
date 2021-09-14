@@ -26,4 +26,16 @@ export class HttpService {
     updatePersonData(id: number, body: any): Observable<any> {
       return this.httpClient.put(this.baseURL + "/update/" + id, body);
     }
+
+    getAddressBookDetailsByID(id: number): Observable<any> {
+      return this.httpClient.get(this.baseURL + "/personId/",
+        {
+          headers: new HttpHeaders(),
+          params: new HttpParams().append('personId', id)
+        })
+    }
+
+    getStateDetails(): Observable<any> {
+      return this.httpClient.get(this.baseURL + "/getStateDetails");
+    }
 }
